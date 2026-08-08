@@ -1,7 +1,7 @@
 name: kilife
-description: A private, offline skincare routine tracker with Android notifications.
+description: SkinFlow — a private, offline skincare routine tracker with Android notifications.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
@@ -12,6 +12,8 @@ flutter:
 dependencies:
   flutter:
     sdk: flutter
+  drift: 2.34.0
+  drift_flutter: ^0.3.1
   flutter_local_notifications: ^22.2.0
   flutter_timezone: ^5.1.0
   shared_preferences: ^2.5.5
@@ -21,3 +23,5 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  build_runner: 2.15.1
+  drift_dev: 2.34.0

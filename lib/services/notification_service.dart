@@ -98,7 +98,7 @@ class NotificationService {
   Future<void> showTestNotification() async {
     await _plugin.show(
       id: 9999,
-      title: 'KiLife notifications are working',
+      title: 'SkinFlow notifications are working',
       body: 'Your skincare reminders are ready.',
       notificationDetails: _details,
       payload: 'test',

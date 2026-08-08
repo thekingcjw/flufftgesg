@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/routine.dart';
+import '../theme/skinflow_theme.dart';
 
 class RoutineCard extends StatelessWidget {
   const RoutineCard({
@@ -16,13 +17,12 @@ class RoutineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final accent = _accentFor(routine.kind, colors);
+    final accent = _accentFor(routine.kind);
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -32,10 +32,12 @@ class RoutineCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.16),
+                    color: SkinFlowColors.cardEmphasized,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: accent),
                   ),
-                  child: Icon(_iconFor(routine.kind), color: accent),
+                  alignment: Alignment.center,
+                  child: Icon(_iconFor(routine.kind), color: accent, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -45,14 +47,28 @@ class RoutineCard extends StatelessWidget {
                       Text(
                         routine.title,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w500,
+                              color: SkinFlowColors.primaryText,
                             ),
                       ),
+                      if (routine.typeLabel != null) ...<Widget>[
+                        const SizedBox(height: 3),
+                        Text(
+                          routine.typeLabel!,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: accent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
                       const SizedBox(height: 2),
                       Text(
                         routine.description,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colors.onSurfaceVariant,
+                              color: SkinFlowColors.secondaryText,
+                              height: 1.25,
                             ),
                       ),
                     ],
@@ -60,26 +76,16 @@ class RoutineCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             for (var index = 0; index < routine.steps.length; index++) ...<Widget>[
               _StepRow(step: routine.steps[index], accent: accent),
-              if (index != routine.steps.length - 1)
-                Padding(
-                  padding: const EdgeInsets.only(left: 17),
-                  child: Container(
-                    height: 18,
-                    width: 2,
-                    color: colors.outlineVariant,
-                  ),
-                ),
+              if (index != routine.steps.length - 1) const SizedBox(height: 12),
             ],
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
+            const SizedBox(height: 24),
+            Center(
+              child: FilledButton(
                 onPressed: () => onChanged(!complete),
-                icon: Icon(complete ? Icons.check_circle : Icons.circle_outlined),
-                label: Text(complete ? 'Completed' : 'Mark complete'),
+                child: Text(complete ? 'Completed' : 'Mark complete'),
               ),
             ),
           ],
@@ -88,20 +94,20 @@ class RoutineCard extends StatelessWidget {
     );
   }
 
-  Color _accentFor(RoutineKind kind, ColorScheme colors) {
+  Color _accentFor(RoutineKind kind) {
     return switch (kind) {
-      RoutineKind.morning => colors.tertiary,
-      RoutineKind.retinal => colors.primary,
-      RoutineKind.exfoliation => colors.secondary,
-      RoutineKind.recovery => colors.primaryContainer,
+      RoutineKind.morning => SkinFlowColors.morning,
+      RoutineKind.retinal => SkinFlowColors.retinal,
+      RoutineKind.exfoliation => SkinFlowColors.exfoliation,
+      RoutineKind.recovery => SkinFlowColors.recovery,
     };
   }
 
   IconData _iconFor(RoutineKind kind) {
     return switch (kind) {
-      RoutineKind.morning => Icons.wb_sunny_outlined,
-      RoutineKind.retinal => Icons.science_outlined,
-      RoutineKind.exfoliation => Icons.auto_awesome_outlined,
+      RoutineKind.morning => Icons.wb_sunny_rounded,
+      RoutineKind.retinal => Icons.circle,
+      RoutineKind.exfoliation => Icons.auto_awesome,
       RoutineKind.recovery => Icons.shield_outlined,
     };
   }
@@ -115,40 +121,65 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 52),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: SkinFlowColors.cardEmphasized,
+              shape: BoxShape.circle,
+              border: Border.all(color: accent),
+            ),
+            alignment: Alignment.center,
+            child: Icon(step.icon, color: accent, size: 17),
           ),
-          child: Icon(step.icon, size: 20, color: accent),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 1),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
                   step.subtitle.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    height: 1.1,
+                  ),
                 ),
                 const SizedBox(height: 2),
-                Text(step.title),
+                Text(
+                  step.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SkinFlowColors.primaryText,
+                    fontSize: 14,
+                    height: 1.25,
+                  ),
+                ),
+                if (step.note != null) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    step.note!,
+                    style: const TextStyle(
+                      color: SkinFlowColors.secondaryText,
+                      fontSize: 12,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

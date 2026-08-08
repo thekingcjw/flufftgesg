@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build SkinFlow Android APK
 
 on:
   push:
@@ -12,13 +12,15 @@ permissions:
 
 jobs:
   build:
-    name: Build KiLife APK
+    name: Build, test, and verify SkinFlow release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -43,25 +45,119 @@ jobs:
       - name: Generate Android project wrapper
         run: |
           flutter create . --platforms=android --org com.kisama --project-name kilife
-          python3 tool/patch_android.py
           rm -f test/widget_test.dart
+
+      - name: Configure permanent SkinFlow signing
+        env:
+          KEYSTORE_B64: ${{ secrets.SKINFLOW_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.SKINFLOW_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SKINFLOW_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Permanent SkinFlow signing secrets are not configured."
+            exit 1
+          fi
+
+          echo "::add-mask::$STORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+
+          KEYSTORE_PATH="$RUNNER_TEMP/skinflow-release.jks"
+          SIGNING_PROPERTIES="$RUNNER_TEMP/skinflow-signing.properties"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+
+          echo '28e0ff1a1169e319a1b19b23668e46953bda53dd5894eebb526efd20d43d286d  '"$KEYSTORE_PATH" | sha256sum -c -
+
+          KEYSTORE_INFO="$(keytool -list -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$STORE_PASSWORD")"
+          echo "$KEYSTORE_INFO" | grep -F 'Alias name: skinflow-release'
+          echo "$KEYSTORE_INFO" | grep -F 'SHA256: AD:3E:C4:43:3C:24:73:5E:F4:25:EF:81:99:F2:08:8B:93:77:BF:83:0D:A9:56:65:C9:11:7A:AD:3F:A1:85:92'
+
+          # Validate the private-key password without persisting it in the job environment.
+          keytool -certreq \
+            -alias skinflow-release \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -file "$RUNNER_TEMP/skinflow-signing-check.csr" >/dev/null
+
+          {
+            printf 'storeFile=%s\n' "$KEYSTORE_PATH"
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyAlias=skinflow-release\n'
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > "$SIGNING_PROPERTIES"
+          chmod 600 "$KEYSTORE_PATH" "$SIGNING_PROPERTIES"
+
+          {
+            echo "SKINFLOW_SIGNING_PROPERTIES_PATH=$SIGNING_PROPERTIES"
+            echo "SKINFLOW_CERT_SHA256=AD:3E:C4:43:3C:24:73:5E:F4:25:EF:81:99:F2:08:8B:93:77:BF:83:0D:A9:56:65:C9:11:7A:AD:3F:A1:85:92"
+          } >> "$GITHUB_ENV"
+
+      - name: Patch Android project
+        run: python3 tool/patch_android.py
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate Drift code
+        run: dart run build_runner build --force-jit --delete-conflicting-outputs
+
       - name: Analyze project
         run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Require permanent release signing
+        run: |
+          if [ -z "${SKINFLOW_SIGNING_PROPERTIES_PATH:-}" ]; then
+            echo "::error::Permanent SkinFlow release signing is not configured."
+            exit 1
+          fi
 
       - name: Build release APK
         run: flutter build apk --release
 
+      - name: Verify release certificate
+        run: |
+          CERT_OUTPUT="$($ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk)"
+          echo "$CERT_OUTPUT"
+          echo "$CERT_OUTPUT" | grep -Fi 'ad3ec4433c24735ef425ef8199f2088b9377bf830da95665c9117aad3fa18592'
+
+      - name: Verify APK package metadata
+        run: |
+          APK_INFO="$($ANDROID_HOME/build-tools/36.0.0/aapt dump badging build/app/outputs/flutter-apk/app-release.apk | head -n 1)"
+          echo "$APK_INFO"
+          echo "$APK_INFO" | grep -F "name='com.kisama.kilife'"
+          echo "$APK_INFO" | grep -F "versionName='0.2.0'"
+
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          fi
+
+      - name: Verify clean install and package identity
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install build/app/outputs/flutter-apk/app-release.apk
+            adb shell dumpsys package com.kisama.kilife | grep -F 'versionName=0.2.0'
+            adb shell pm path com.kisama.kilife
+
       - name: Prepare APK artifact
-        run: cp build/app/outputs/flutter-apk/app-release.apk KiLife-v0.1.0.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk SkinFlow-v0.2.0.apk
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: KiLife-Android
-          path: KiLife-v0.1.0.apk
+          name: SkinFlow-Android
+          path: SkinFlow-v0.2.0.apk
           if-no-files-found: error
           retention-days: 30
